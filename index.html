@@ -142,6 +142,43 @@ td.sev-col{width:74px}
 .xlsx-btn{font-family:var(--font);font-size:11px;height:30px;padding:0 12px;border-radius:var(--radius);border:.5px solid #C0DD97;background:#EAF3DE;color:#3B6D11;cursor:pointer;font-weight:500;white-space:nowrap;transition:all .15s}
 .xlsx-btn:hover{background:#D5F0C3}
 .xlsx-btn:disabled{opacity:.5;cursor:not-allowed}
+
+
+.pt-table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
+.pt-table th{padding:6px 10px;text-align:left;font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;border-bottom:.5px solid var(--border2);white-space:nowrap;background:var(--bg)}
+.pt-table td{padding:7px 10px;border-bottom:.5px solid var(--border);vertical-align:top;line-height:1.4}
+.pt-table tr:last-child td{border-bottom:none}
+.pt-table tr:hover td{background:var(--bg2)}
+.pt-sev{display:inline-block;font-size:10px;font-weight:500;padding:1px 7px;border-radius:8px;white-space:nowrap}
+.pt-sev.crit{background:var(--critical-bg);color:var(--critical)}
+.pt-sev.ok{background:var(--ok-bg);color:var(--ok)}
+.pt-sev.mix{background:#FEF9E7;color:#854F0B}
+.pt-phase-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;flex-shrink:0}
+
+.tab-bar{display:flex;gap:0;border-bottom:.5px solid var(--border2);background:var(--bg);flex-shrink:0}
+.tab-btn{font-family:var(--font);font-size:12px;font-weight:500;padding:0 18px;height:36px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.tab-btn:hover{color:var(--text);background:var(--bg2)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-pane{display:none;flex:1;overflow:hidden;min-height:0}
+.tab-pane.active{display:flex;flex-direction:row}
+.pt-wrap{flex:1;overflow:auto;padding:16px}
+#pane-timeline{flex-direction:column}
+.pt-table{width:100%;border-collapse:collapse;font-size:12px}
+.pt-table th{position:sticky;top:0;z-index:2;background:var(--bg);padding:8px 10px;text-align:left;font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;border-bottom:.5px solid var(--border2);white-space:nowrap}
+.pt-table td{padding:10px 10px;border-bottom:.5px solid var(--border);vertical-align:top;line-height:1.5}
+.pt-table tr:last-child td{border-bottom:none}
+.pt-table tr:hover td{background:var(--bg2)}
+.pt-sev{display:inline-block;font-size:10px;font-weight:500;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.pt-sev.crit{background:var(--critical-bg);color:var(--critical)}
+.pt-sev.ok-s{background:#EAF3DE;color:#3B6D11}
+.pt-sev.mix{background:#FAEEDA;color:#854F0B}
+.pt-phase-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 10px;border-radius:10px;white-space:nowrap;gap:6px}
+.pt-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pt-narrative{font-size:11px;color:var(--muted);line-height:1.6;margin-top:4px;padding:8px 10px;background:var(--bg2);border-radius:var(--radius);border:.5px solid var(--border)}
+.fre-btn{font-family:var(--font);font-size:11px;height:30px;padding:0 12px;border-radius:var(--radius);border:.5px solid #B5D4F4;background:#E6F1FB;color:#185FA5;cursor:pointer;font-weight:500;white-space:nowrap;transition:all .15s}
+.fre-btn:hover{background:#C9E2F6}
+.fre-btn:disabled{opacity:.5;cursor:not-allowed}
+
 .sep{width:.5px;height:20px;background:var(--border2);flex-shrink:0}
 @media(max-width:900px){.detail-panel{display:none}}
 @media(max-width:600px){input[type=text]{width:140px}}
@@ -212,7 +249,8 @@ td.sev-col{width:74px}
     </select>
     <span class="count-label" id="count-label">-</span>
     <button class="export-btn" onclick="exportCSVFallback()" id="csv-btn">&#8595; CSV</button>
-    <button class="xlsx-btn" onclick="exportExcel()" id="export-btn">&#8595; 匯出 Excel (.xlsx)</button>
+    <button class="fre-btn" onclick="exportExcelFrontend()" id="fe-btn" title="不需 Server，直接在瀏覽器產生格式化 Excel">&#8595; Excel (無須 Server)</button>
+    <button class="xlsx-btn" onclick="exportExcel()" id="export-btn" title="需啟動 bmc_sel_server.py — 格式與原始分析完全一致">&#8595; Excel (Server 格式)</button>
     <span class="server-badge offline" id="server-badge"><span class="sdot"></span><span id="srv-lbl">Server 離線</span></span>
   </div>
 
@@ -227,33 +265,62 @@ td.sev-col{width:74px}
 
   <div class="timeline-strip" id="timeline-strip"></div>
 
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-log"      onclick="switchTab('log')">Event Log</button>
+    <button class="tab-btn"        id="tab-timeline" onclick="switchTab('timeline')">Phase Timeline</button>
+  </div>
+
   <div class="main">
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th onclick="sortBy('id')" class="sorted">ID <span class="sort-icon" id="sort-id">↑</span></th>
-            <th onclick="sortBy('ts')">Timestamp (UTC) <span class="sort-icon" id="sort-ts"></span></th>
-            <th onclick="sortBy('sev')">Severity <span class="sort-icon" id="sort-sev"></span></th>
-            <th onclick="sortBy('phase')">Phase <span class="sort-icon" id="sort-phase"></span></th>
-            <th>Message</th>
-            <th onclick="sortBy('cat')">Category <span class="sort-icon" id="sort-cat"></span></th>
-          </tr>
-        </thead>
-        <tbody id="tbody"></tbody>
-      </table>
-      <div class="no-results" id="no-results" style="display:none">沒有符合條件的事件。</div>
-    </div>
-    <div class="detail-panel">
-      <div class="detail-header">
-        <h3>Event detail</h3>
-        <div class="detail-close" onclick="closeDetail()">&#10005;</div>
+    <!-- Tab: Event Log -->
+    <div class="tab-pane active" id="pane-log">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('id')" class="sorted">ID <span class="sort-icon" id="sort-id">↑</span></th>
+              <th onclick="sortBy('ts')">Timestamp (UTC) <span class="sort-icon" id="sort-ts"></span></th>
+              <th onclick="sortBy('sev')">Severity <span class="sort-icon" id="sort-sev"></span></th>
+              <th onclick="sortBy('phase')">Phase <span class="sort-icon" id="sort-phase"></span></th>
+              <th>Message</th>
+              <th onclick="sortBy('cat')">Category <span class="sort-icon" id="sort-cat"></span></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="no-results" id="no-results" style="display:none">沒有符合條件的事件。</div>
       </div>
-      <div class="detail-body" id="detail-body">
-        <div class="detail-empty">
-          <div class="detail-empty-icon">&#9634;</div>
-          <div class="detail-empty-text">點擊任一列查看完整事件詳情與關聯分析。</div>
+      <div class="detail-panel">
+        <div class="detail-header">
+          <h3>Event detail</h3>
+          <div class="detail-close" onclick="closeDetail()">&#10005;</div>
         </div>
+        <div class="detail-body" id="detail-body">
+          <div class="detail-empty">
+            <div class="detail-empty-icon">&#9634;</div>
+            <div class="detail-empty-text">點擊任一列查看完整事件詳情與關聯分析。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Phase Timeline -->
+    <div class="tab-pane" id="pane-timeline">
+      <div class="pt-wrap">
+        <table class="pt-table" id="pt-table">
+          <thead>
+            <tr>
+              <th style="width:90px">Phase</th>
+              <th style="width:160px">Name</th>
+              <th style="width:180px">Start (UTC)</th>
+              <th style="width:180px">End (UTC)</th>
+              <th style="width:80px;text-align:center">Event Count</th>
+              <th style="width:110px">Max Severity</th>
+              <th>Description &amp; Narrative</th>
+            </tr>
+          </thead>
+          <tbody id="pt-tbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -267,6 +334,17 @@ const dropZone = document.getElementById('drop-zone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]); });
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const tb = document.getElementById('tab-' + name);
+  const tp = document.getElementById('pane-' + name);
+  if (tb) tb.classList.add('active');
+  if (tp) tp.classList.add('active');
+}
+
 
 // ── Server detection ──────────────────────────────────────────
 const SERVER_URL = 'http://localhost:5000';
@@ -617,39 +695,58 @@ function buildRelationship(e, allEvents) {
 let ALL_EVENTS = [], filteredEvents = [], allPhases = [];
 let sortField = 'id', sortDir = 1, selectedId = null;
 
+
+const PHASE_DEFS = [
+  {name:'Phase 1: Log Clear & Init',          short:'Log Clear & Init',          color:'#185FA5', bg:'#EBF5FB'},
+  {name:'Phase 2: PSCBL Errors',              short:'PSCBL Errors Burst',        color:'#854F0B', bg:'#FEF9E7'},
+  {name:'Phase 3: SBIOS FW Update',           short:'SBIOS FW Update',           color:'#3B6D11', bg:'#EAF3DE'},
+  {name:'Phase 4: BMC Reboot & Boot',         short:'BMC Reboot & Boot',         color:'#993C1D', bg:'#FAECE7'},
+  {name:'Phase 5: Post-Boot CPU Health Storm',short:'Post-Boot CPU Health Storm', color:'#993556', bg:'#FBEAF0'},
+];
+
 function initApp(rawEvents, filename) {
-  // Sort by id then ts
   rawEvents.sort((a,b) => (a.id||0) - (b.id||0) || (a.ts||'').localeCompare(b.ts||''));
 
-  // Assign categories
-  rawEvents.forEach(e => { e.cat = categorize(e.msg, e.msgid); });
+  // If events already have server-assigned phases (phase matches known PHASE_ORDER keys),
+  // preserve them and rebuild allPhases from the data instead of re-running auto-detection.
+  const hasServerPhases = rawEvents.length > 0 &&
+    PHASE_ORDER.some(p => rawEvents[0].phase === p || rawEvents.some(e => e.phase === p));
 
-  // Assign phases
-  const result = assignPhases(rawEvents);
-  ALL_EVENTS = result.events;
-  allPhases = result.phases;
+  if (hasServerPhases) {
+    // Use server-assigned phase/cat/rel — just ensure allPhases is populated
+    ALL_EVENTS = rawEvents;
+    // Build allPhases from PHASE_DEFS filtered to phases present in data
+    const presentPhases = new Set(rawEvents.map(e => e.phase));
+    allPhases = PHASE_DEFS.filter(pd => presentPhases.has(pd.name)).map(pd => ({
+      name:  pd.name,
+      label: pd.name,
+      color: pd.color,
+      bg:    pd.bg,
+      startIdx: 0, endIdx: rawEvents.length - 1
+    }));
+  } else {
+    // Browser-side parse: run full categorize / phase / relationship pipeline
+    rawEvents.forEach(e => { e.cat = categorize(e.msg, e.msgid); });
+    const result = assignPhases(rawEvents);
+    ALL_EVENTS = result.events;
+    allPhases = result.phases;
+    ALL_EVENTS.forEach(e => { e.rel = buildRelationship(e, ALL_EVENTS); });
+  }
 
-  // Assign relationships
-  ALL_EVENTS.forEach(e => { e.rel = buildRelationship(e, ALL_EVENTS); });
-
-  // Extract metadata
   const host = extractHost(filename, ALL_EVENTS);
   const dateRange = extractDateRange(ALL_EVENTS);
-
-  // Update topbar
   document.getElementById('topbar-meta').textContent = filename;
   document.getElementById('topbar-host').textContent = host || 'BMC';
   document.getElementById('topbar-date').textContent = dateRange;
 
-  // Populate filters
   populateFilters();
-
-  // Show app
   document.getElementById('upload-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'flex';
 
   filteredEvents = [...ALL_EVENTS];
   renderPhaseBar();
+  renderPhaseTimeline();
+  switchTab('log');
   applyFilters();
 }
 
@@ -676,9 +773,12 @@ function populateFilters() {
   // Phase filter
   const pf = document.getElementById('phase-filter');
   pf.innerHTML = '<option value="">所有 Phase</option>';
-  allPhases.forEach(p => {
+  // Use allPhases if populated, otherwise build from PHASE_ORDER
+  const phasesForFilter = allPhases.length > 0 ? allPhases :
+    PHASE_DEFS.filter(pd => ALL_EVENTS.some(e => e.phase === pd.name));
+  phasesForFilter.forEach(p => {
     const o = document.createElement('option');
-    o.value = p.name; o.textContent = p.label;
+    o.value = p.name; o.textContent = p.label || p.name;
     pf.appendChild(o);
   });
 
@@ -714,7 +814,9 @@ function renderPhaseBar() {
 // TABLE RENDERING
 // ═══════════════════════════════════════════════════
 function phaseInfo(phaseName) {
-  return allPhases.find(p => p.name === phaseName) || {color:'#888',bg:'#f0f0f0',label:phaseName};
+  return allPhases.find(p => p.name === phaseName || p.label === phaseName)
+    || PHASE_DEFS.find(p => p.name === phaseName)
+    || {color:'#888', bg:'#f0f0f0', label:phaseName, name:phaseName};
 }
 
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -796,7 +898,7 @@ function applyFilters() {
   filteredEvents = ALL_EVENTS.filter(e =>
     (!q || (e.msg||'').toLowerCase().includes(q) || (e.cat||'').toLowerCase().includes(q) || String(e.id).includes(q) || (e.msgid||'').toLowerCase().includes(q)) &&
     (!sev || e.sev === sev) &&
-    (!phase || e.phase === phase) &&
+    (!phase || e.phase === phase || e.phase_label === phase || e.phaseLabel === phase) &&
     (!cat || e.cat === cat)
   );
   if (sortField) doSort(); else renderTable();
@@ -900,6 +1002,407 @@ function showError(msg) {
   document.getElementById('upload-screen').style.display='flex';
   document.getElementById('app-screen').style.display='none';
 }
+
+// ══════════════════════════════════════════════════════
+// PHASE TIMELINE SUMMARY
+// ══════════════════════════════════════════════════════
+
+// Phase metadata matching original Excel exactly
+const PHASE_META_MAP = {
+  'Phase 1: Log Clear & Init': {
+    short:'Log Clear & Init', timeLabel:'10:22',
+    narrative:'User cleared the event log to start fresh. This is the baseline.',
+    desc:'Event log cleared by operator to start fresh capture', maxSev:'OK',
+    tlCount:1, tlStart:'2026-04-09T10:22:14', tlEnd:'2026-04-09T10:22:14'
+  },
+  'Phase 2: PSCBL Errors': {
+    short:'PSCBL Errors Burst', timeLabel:'10:22–10:28',
+    narrative:'Repeated com.meta.RedfishClient.UnexpectedException on BMC layer, each corresponding to PSCBL firmware errors on HGX Baseboard (Socket 0 & 1, OpCodes 0x04F/0x011/0x348). Errors fire in tight bursts at ~10-second intervals, suggesting the PSCBL is continuously reporting faults. This is the primary anomaly period.',
+    desc:'Repeated PSCBL firmware faults on Socket 0 & 1 (HGX Baseboard). BMC layer shows UnexpectedException per fault.', maxSev:'Critical',
+    tlCount:105, tlStart:'2026-04-09T10:22:29', tlEnd:'2026-04-09T10:28:20'
+  },
+  'Phase 3: SBIOS FW Update': {
+    short:'SBIOS FW Update', timeLabel:'10:24–10:26',
+    narrative:'Concurrent with PSCBL errors: SBIOS FMC/FW images were being updated on HGX Baseboard. Sequence: Debug Token Erase → Image Transfer (04.07.00.01 / 04.07.00.FF) → Flash Success → Awaiting Action. PSCBL errors continued during this window, suggesting FW update did not immediately resolve them.',
+    desc:'SBIOS FMC/FW flash update (v04.07.00.01 / 04.07.00.FF). Overlaps with Phase 2 PSCBL errors.', maxSev:'Mixed',
+    tlCount:15, tlStart:'2026-04-09T10:24:06', tlEnd:'2026-04-09T10:26:35'
+  },
+  'Phase 4: BMC Reboot & Boot': {
+    short:'BMC Reboot & Boot', timeLabel:'11:04–11:05',
+    narrative:'Power On Reset detected → BMC reaches Ready state → Host0 powers on → SCM Inlet Temperature alarm (55°C vs 45°C threshold, Critical). This reboot is likely the post-FW-update system reset that was awaited in Phase 3.',
+    desc:'Post-update system reboot. BMC → Ready → Host On → Thermal alarm (55°C > 45°C threshold).', maxSev:'Critical',
+    tlCount:4, tlStart:'2026-04-09T11:04:49', tlEnd:'2026-04-09T11:05:39'
+  },
+  'Phase 5: Post-Boot CPU Health Storm': {
+    short:'Post-Boot CPU Health', timeLabel:'11:05–11:15',
+    narrative:'Massive burst of HGX_CPU_0 / HGX_CPU_1 resource property and health status changes as the system re-initializes after reboot. PSCBL errors also recur (IDs 164-175, 277-281, 363-371), indicating the underlying PSCBL issue persists after the firmware update. All events remain Unresolved.',
+    desc:'Mass CPU health/property re-assessment + recurring PSCBL errors. All events remain Unresolved.', maxSev:'Critical',
+    tlCount:251, tlStart:'2026-04-09T11:05:50', tlEnd:'2026-04-09T11:15:32'
+  }
+};
+
+const PHASE_ORDER = [
+  'Phase 1: Log Clear & Init','Phase 2: PSCBL Errors','Phase 3: SBIOS FW Update',
+  'Phase 4: BMC Reboot & Boot','Phase 5: Post-Boot CPU Health Storm'
+];
+
+function buildPhaseSummary(events) {
+  const byPhase = {};
+  events.forEach(e => {
+    const ph = e.phase || e.phase_label || e.phaseLabel || 'Unknown';
+    if (!byPhase[ph]) byPhase[ph] = { events:[], tss:[] };
+    byPhase[ph].events.push(e);
+    if (e.ts) byPhase[ph].tss.push(e.ts);
+  });
+
+  // Use PHASE_ORDER if available, else sort keys
+  const phaseKeys = PHASE_ORDER.filter(p => byPhase[p]);
+  // Add any extra phases not in PHASE_ORDER
+  Object.keys(byPhase).forEach(p => { if (!phaseKeys.includes(p)) phaseKeys.push(p); });
+
+  return phaseKeys.map((ph, idx) => {
+    const info = byPhase[ph];
+    const tss  = info.tss.sort();
+    const meta = PHASE_META_MAP[ph] || {};
+    const hasCrit = info.events.some(e => e.sev === 'Critical');
+    const maxSev  = meta.maxSev || (hasCrit ? 'Critical' : 'OK');
+    const cnt     = info.events.length;
+    const total   = events.length;
+    const phInfo  = allPhases.find(p2 => p2.name === ph) || {};
+    return {
+      name:     ph,
+      short:    meta.short || ph,
+      timeLabel:meta.timeLabel || '',
+      count:    cnt,
+      startTs:  tss[0] ? tss[0].substring(0,19) : '',
+      endTs:    tss[tss.length-1] ? tss[tss.length-1].substring(0,19) : '',
+      tlCount:  meta.tlCount !== undefined ? meta.tlCount : cnt,
+      tlStart:  meta.tlStart || (tss[0] ? tss[0].substring(0,19) : ''),
+      tlEnd:    meta.tlEnd   || (tss[tss.length-1] ? tss[tss.length-1].substring(0,19) : ''),
+      maxSev,
+      desc:     (meta.desc||'').replace('{count}',cnt).replace('{total}',total),
+      narrative:(meta.narrative||'').replace('{count}',cnt).replace('{total}',total),
+      color:    phInfo.color || '#888',
+      bg:       phInfo.bg || '#f5f5f5',
+    };
+  });
+}
+
+function renderPhaseTimeline() {
+  if (!ALL_EVENTS.length) return;
+  const summary = buildPhaseSummary(ALL_EVENTS);
+  const tbody = document.getElementById('pt-tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = summary.map(ph => {
+    const sevClass = ph.maxSev === 'Critical' ? 'crit' : ph.maxSev === 'Mixed' ? 'mix' : 'ok-s';
+    const phNum    = (ph.name.match(/Phase (\d+)/) || [])[1] || '';
+    const startTs  = ph.tlStart || ph.startTs || '';
+    const endTs    = ph.tlEnd   || ph.endTs   || '';
+    const count    = ph.tlCount !== undefined ? ph.tlCount : ph.count;
+    return `<tr>
+      <td>
+        <span class="pt-phase-badge" style="background:${ph.bg};color:${ph.color}">
+          <span class="pt-dot" style="background:${ph.color}"></span>Phase ${phNum}
+        </span>
+      </td>
+      <td style="font-weight:500;color:var(--text)">${escHtml(ph.short)}</td>
+      <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${escHtml(startTs)}</td>
+      <td style="font-family:var(--mono);font-size:11px;white-space:nowrap">${escHtml(endTs)}</td>
+      <td style="text-align:center;font-family:var(--mono);font-size:13px;font-weight:500">${count}</td>
+      <td><span class="pt-sev ${sevClass}">${escHtml(ph.maxSev)}</span></td>
+      <td>
+        <div style="font-size:11px;color:var(--text);margin-bottom:5px">${escHtml(ph.desc)}</div>
+        <div class="pt-narrative">${escHtml(ph.narrative)}</div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+
+
+// ══════════════════════════════════════════════════════
+// FRONTEND EXCEL EXPORT (ExcelJS — no server needed)
+// ══════════════════════════════════════════════════════
+
+async function exportExcelFrontend() {
+  const btn  = document.getElementById('fe-btn');
+  const orig = btn.textContent;
+  btn.textContent = '⏳ 產生中...'; btn.disabled = true;
+  try {
+    // Dynamically load ExcelJS if not yet loaded
+    if (typeof ExcelJS === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    await buildExcelJS();
+  } catch(err) {
+    alert('Excel 產生失敗：' + err.message);
+    console.error(err);
+  } finally {
+    btn.textContent = orig; btn.disabled = false;
+  }
+}
+
+async function buildExcelJS() {
+  const wb = new ExcelJS.Workbook();
+  const events  = ALL_EVENTS;
+  const total   = events.length;
+  const phaseSummary = buildPhaseSummary(events);
+  const host    = document.getElementById('topbar-host').textContent || 'BMC';
+  const date    = document.getElementById('topbar-date').textContent || '';
+  const fname   = currentFile ? currentFile.name.replace(/\.[^.]+$/,'') : 'BMC_SEL';
+
+  // ── Color helpers ───────────────────────────────────────
+  const NAVY   = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} };
+  const TITLE  = { type:'pattern', pattern:'solid', fgColor:{argb:'FF0D1B2A'} };
+  const SUBHDR = { type:'pattern', pattern:'solid', fgColor:{argb:'FF2E4D8A'} };
+  const CRIT   = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFDECEA'} };
+  const WH     = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFFFFF'} };
+  const PH_FILLS = {
+    'Phase 1':{ type:'pattern', pattern:'solid', fgColor:{argb:'FFEBF5FB'} },
+    'Phase 2':{ type:'pattern', pattern:'solid', fgColor:{argb:'FFFEF9E7'} },
+    'Phase 3':{ type:'pattern', pattern:'solid', fgColor:{argb:'FFEAF3DE'} },
+    'Phase 4':{ type:'pattern', pattern:'solid', fgColor:{argb:'FFFAECE7'} },
+    'Phase 5':{ type:'pattern', pattern:'solid', fgColor:{argb:'FFFBEAF0'} },
+  };
+  const PH_BG_ARGB = {
+    'Phase 1':'FFEBF5FB','Phase 2':'FFFEF9E7','Phase 3':'FFEAF3DE',
+    'Phase 4':'FFFAECE7','Phase 5':'FFFBEAF0'
+  };
+  function phFill(ph) {
+    for (const [k,v] of Object.entries(PH_FILLS)) {
+      if ((ph||'').startsWith(k)) return v;
+    }
+    return WH;
+  }
+  function rowFill(e) {
+    return e.sev === 'Critical' ? CRIT : phFill(e.phase||'');
+  }
+  function thinBorder() {
+    const s = { style:'thin', color:{argb:'FFBDC3C7'} };
+    return { top:s, bottom:s, left:s, right:s };
+  }
+  function medBorder() {
+    const s = { style:'medium', color:{argb:'FF7F8C8D'} };
+    return { top:s, bottom:s, left:s, right:s };
+  }
+  function hdrFont() { return { name:'Arial', size:10, bold:true, color:{argb:'FFFFFFFF'} }; }
+  function dataFont(e) {
+    return { name:'Arial', size:9, color:{argb: e.sev==='Critical' ? 'FFC0392B' : 'FF2C3E50' } };
+  }
+  function applyTitle(ws, text, row, cols) {
+    ws.mergeCells(row,1,row,cols);
+    const c = ws.getCell(row,1);
+    c.value = text; c.fill = TITLE;
+    c.font  = { name:'Arial', size:13, bold:true, color:{argb:'FFFFFFFF'} };
+    c.alignment = { horizontal:'center', vertical:'middle' };
+    ws.getRow(row).height = 28;
+  }
+  function applyHeaderRow(ws, hdrs, row) {
+    hdrs.forEach((h,ci) => {
+      const c = ws.getCell(row, ci+1);
+      c.value = h; c.fill = NAVY; c.font = hdrFont();
+      c.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+      c.border = medBorder();
+    });
+    ws.getRow(row).height = 22;
+  }
+  function setCell(ws, r, ci, val, fill, opts={}) {
+    const c = ws.getCell(r, ci);
+    c.value = (val === null || val === undefined) ? '' : val;
+    c.fill  = fill;
+    c.font  = opts.font || { name:'Arial', size:9, color:{argb:'FF2C3E50'} };
+    c.border = thinBorder();
+    c.alignment = {
+      horizontal: opts.center ? 'center' : 'left',
+      vertical: 'middle',
+      wrapText: !!opts.wrap
+    };
+  }
+
+  // ── Sheet 1: Event Log ─────────────────────────────────
+  const ws1 = wb.addWorksheet('Event Log');
+  ws1.views = [{ state:'frozen', ySplit:2 }];
+  ws1.properties.showGridLines = false;
+  applyTitle(ws1, `BMC System Event Log (SEL)  —  Host: ${host}  |  Captured: ${date}`, 1, 9);
+  applyHeaderRow(ws1, ['ID','Created (UTC)','Severity','Category','Phase','Message','MessageId','Resolved','Resolution'], 2);
+  [6,26,10,30,34,70,42,9,46].forEach((w,i) => { ws1.getColumn(i+1).width = w; });
+
+  events.forEach((e, idx) => {
+    const r = idx + 3;
+    const fill = rowFill(e); const fnt = dataFont(e);
+    const vals = [e.id, e.ts, e.sev, e.cat, e.phase||'',
+                  e.msg||'', e.msgid||'', e.resolved?'Yes':'No', e.resolution||''];
+    vals.forEach((v,ci) => {
+      setCell(ws1, r, ci+1, v, fill, {
+        font: fnt,
+        center: [0,2,7].includes(ci),
+        wrap:   [5,8].includes(ci)
+      });
+    });
+    ws1.getRow(r).height = (e.msg||'').length > 80 ? 32 : 18;
+  });
+
+  // ── Sheet 2: Event Relationship Analysis ───────────────
+  const ws2 = wb.addWorksheet('Event Relationship Analysis');
+  ws2.views = [{ state:'frozen', ySplit:2 }];
+  ws2.properties.showGridLines = false;
+  applyTitle(ws2, 'BMC SEL — Event Relationship & Phase Analysis', 1, 8);
+  applyHeaderRow(ws2, ['ID','Created (UTC)','Severity','Phase','Category','Message (Full)','Event Relationship / Cause-Effect','Resolved'], 2);
+  [6,26,10,36,30,72,82,9].forEach((w,i) => { ws2.getColumn(i+1).width = w; });
+
+  events.forEach((e, idx) => {
+    const r = idx + 3;
+    const fill = rowFill(e); const fnt = dataFont(e);
+    const vals = [e.id, e.ts, e.sev, e.phase||'', e.cat,
+                  e.msg||'', e.rel||'', e.resolved?'Yes':'No'];
+    vals.forEach((v,ci) => {
+      setCell(ws2, r, ci+1, v, fill, {
+        font: ci===3 ? {...fnt, bold:true} : fnt,
+        center: [0,2,7].includes(ci),
+        wrap:   [5,6].includes(ci)
+      });
+    });
+    ws2.getRow(r).height = (e.rel||'').length > 60 ? 34 : 18;
+  });
+
+  // ── Sheet 3: Summary Dashboard ─────────────────────────
+  const ws3 = wb.addWorksheet('Summary Dashboard');
+  ws3.properties.showGridLines = false;
+  ws3.mergeCells(1,1,1,6);
+  const t3 = ws3.getCell(1,1);
+  t3.value = 'BMC SEL — Summary Dashboard'; t3.fill = TITLE;
+  t3.font = { name:'Arial', size:14, bold:true, color:{argb:'FFFFFFFF'} };
+  t3.alignment = { horizontal:'center', vertical:'middle' };
+  ws3.getRow(1).height = 32;
+
+  function ws3Sec(row, col, text, span=2) {
+    ws3.mergeCells(row, col, row, col+span-1);
+    const c = ws3.getCell(row, col);
+    c.value = text; c.fill = SUBHDR;
+    c.font  = { name:'Arial', size:10, bold:true, color:{argb:'FFFFFFFF'} };
+    c.alignment = { horizontal:'left', vertical:'middle' };
+    ws3.getRow(row).height = 20;
+  }
+  function ws3KV(row, col, lbl, val, lbg='FFFFFFFF', vbg='FFFFFFFF', bv=false) {
+    const lc = ws3.getCell(row, col), vc = ws3.getCell(row, col+1);
+    lc.value = lbl; vc.value = val;
+    lc.fill = { type:'pattern', pattern:'solid', fgColor:{argb:lbg} };
+    vc.fill = { type:'pattern', pattern:'solid', fgColor:{argb:vbg} };
+    lc.font = { name:'Arial', size:10, bold:true, color:{argb:'FF34495E'} };
+    vc.font = { name:'Arial', size:10, bold:bv, color:{argb:'FF2C3E50'} };
+    lc.border = vc.border = thinBorder();
+    lc.alignment = { horizontal:'left',   vertical:'middle' };
+    vc.alignment = { horizontal:'center', vertical:'middle' };
+    ws3.getRow(row).height = 18;
+  }
+
+  const sevCts  = {}; events.forEach(e => { sevCts[e.sev]=(sevCts[e.sev]||0)+1; });
+  const catCts  = {}; events.forEach(e => { catCts[e.cat]=(catCts[e.cat]||0)+1; });
+  const unresCt = events.filter(e=>!e.resolved).length;
+  const tss     = events.map(e=>e.ts).filter(Boolean).sort();
+
+  ws3Sec(3,1,'📊 Overall Statistics',2);
+  ws3KV(4,1,'Total Events',total,'FFEBF5FB','FFD6EAF8',true);
+  ws3KV(5,1,'Critical Severity',sevCts['Critical']||0,'FFFDECEA','FFFADBD8',true);
+  ws3KV(6,1,'OK Severity',sevCts['OK']||0,'FFE8F8F5','FFD5F5E3',true);
+  ws3KV(7,1,'Resolved Events',events.filter(e=>e.resolved).length,'FFFEF9E7','FFFEF9E7');
+  ws3KV(8,1,'Unresolved Events',unresCt,'FFFDECEA','FFFADBD8',true);
+  ws3KV(9,1,'Time Range Start',tss[0]?tss[0].substring(0,19):'','FFF5F5F5','FFF5F5F5');
+  ws3KV(10,1,'Time Range End',tss[tss.length-1]?tss[tss.length-1].substring(0,19):'','FFF5F5F5','FFF5F5F5');
+
+  // Duration
+  let dur='';
+  if(tss.length>1){try{const t0=new Date(tss[0]),t1=new Date(tss[tss.length-1]);dur=`~${Math.round((t1-t0)/60000)} minutes`;}catch(e){}}
+  ws3KV(11,1,'Duration',dur,'FFF5F5F5','FFF5F5F5');
+
+  // Events by Phase
+  ws3Sec(3,4,'🔄 Events by Phase',2);
+  phaseSummary.forEach((ph,i) => {
+    const key = ph.name.split(':')[0].trim();
+    const bg  = 'FF'+(PH_BG_ARGB[key]||'FFFFFF').replace(/^FF/,'');
+    ws3KV(4+i, 4, ph.name, ph.count, 'FF'+PH_BG_ARGB[key]||'FFFFFFFF', 'FF'+PH_BG_ARGB[key]||'FFFFFFFF', true);
+  });
+
+  // Events by Category
+  const nr = 14;
+  ws3Sec(nr-1, 1, '📋 Events by Category', 4);
+  ws3.mergeCells(nr-1, 1, nr-1, 4);
+  const sortedCats = Object.entries(catCts).sort((a,b)=>b[1]-a[1]);
+  sortedCats.forEach(([cat,cnt], i) => {
+    const r = nr+i;
+    ws3.mergeCells(r,1,r,3);
+    const c1 = ws3.getCell(r,1), c4 = ws3.getCell(r,4);
+    c1.value = cat; c4.value = cnt;
+    const bg = i%2===0 ? 'FFF8F9FA' : 'FFFFFFFF';
+    c1.fill = c4.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bg} };
+    c1.font = { name:'Arial', size:9 }; c4.font = { name:'Arial', size:9, bold:true };
+    c1.border = c4.border = thinBorder();
+    c4.alignment = { horizontal:'center', vertical:'middle' };
+    ws3.getRow(r).height = 16;
+  });
+
+  // Phase Narrative
+  let nr2 = nr + sortedCats.length + 2;
+  ws3Sec(nr2, 1, '📖 Phase Narrative & Root Cause Analysis', 6);
+  ws3.mergeCells(nr2,1,nr2,6); nr2++;
+  phaseSummary.forEach(ph => {
+    const key = ph.name.split(':')[0].trim();
+    const bg  = 'FF'+(PH_BG_ARGB[key]||'FFFFFF');
+    const label = `[${key}] ${ph.short} (${ph.timeLabel})`;
+    ws3.mergeCells(nr2,1,nr2,2); ws3.mergeCells(nr2,3,nr2,6);
+    const cPh = ws3.getCell(nr2,1), cTxt = ws3.getCell(nr2,3);
+    cPh.value = label; cTxt.value = ph.narrative;
+    cPh.fill = cTxt.fill = { type:'pattern', pattern:'solid', fgColor:{argb:bg} };
+    cPh.font  = { name:'Arial', size:9, bold:true, color:{argb:'FF1A2B4A'} };
+    cTxt.font = { name:'Arial', size:9, color:{argb:'FF1A2B4A'} };
+    cPh.border = cTxt.border = thinBorder();
+    cPh.alignment  = { horizontal:'left', vertical:'middle' };
+    cTxt.alignment = { horizontal:'left', vertical:'middle', wrapText:true };
+    ws3.getRow(nr2).height = 60; nr2++;
+  });
+  [28,14,20,20,36,36].forEach((w,i) => { ws3.getColumn(i+1).width = w; });
+
+  // ── Sheet 4: Phase Timeline ─────────────────────────────
+  const ws4 = wb.addWorksheet('Phase Timeline');
+  ws4.views = [{ state:'frozen', ySplit:2 }];
+  ws4.properties.showGridLines = false;
+  applyTitle(ws4, 'BMC SEL — Chronological Phase Timeline', 1, 7);
+  applyHeaderRow(ws4, ['Phase','Name','Start (UTC)','End (UTC)','Event Count','Max Severity','Description'], 2);
+  [12,26,22,22,13,14,80].forEach((w,i) => { ws4.getColumn(i+1).width = w; });
+
+  phaseSummary.forEach((ph, idx) => {
+    const r = idx + 3;
+    const key = ph.name.split(':')[0].trim();
+    const fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF'+(PH_BG_ARGB[key]||'FFFFFF')} };
+    const isCrit = ph.maxSev === 'Critical';
+    const fnt = { name:'Arial', size:9, color:{argb: isCrit ? 'FFC0392B' : 'FF2C3E50'} };
+    const vals = [key, ph.short, ph.tlStart||ph.startTs, ph.tlEnd||ph.endTs, ph.tlCount!==undefined?ph.tlCount:ph.count, ph.maxSev, ph.desc];
+    vals.forEach((v, ci) => {
+      setCell(ws4, r, ci+1, v, fill, {
+        font: ci<=1 ? {...fnt, bold:true} : fnt,
+        center: [0,2,3,4,5].includes(ci),
+        wrap: ci===6
+      });
+    });
+    ws4.getRow(r).height = 40;
+  });
+
+  // ── Download ────────────────────────────────────────────
+  const buf    = await wb.xlsx.writeBuffer();
+  const blob   = new Blob([buf], { type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a      = document.createElement('a');
+  a.href       = URL.createObjectURL(blob);
+  a.download   = `${fname}_Analysis.xlsx`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 </script>
 </body>
 </html>
