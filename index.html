@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BMC SEL Analyzer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace;
+  --bg:#ffffff;--bg2:#f6f6f6;--bg3:#eeeeee;
+  --text:#1a1a1a;--muted:#666;--hint:#aaa;
+  --border:#e0e0e0;--border2:#ccc;
+  --radius:6px;--radius-lg:10px;
+  --critical:#E24B4A;--critical-bg:#FCEBEB;
+  --ok:#3B6D11;--ok-bg:#EAF3DE;
+  --accent:#185FA5;
+  --p1:#185FA5;--p1-bg:#E6F1FB;
+  --p2:#854F0B;--p2-bg:#FAEEDA;
+  --p3:#3B6D11;--p3-bg:#EAF3DE;
+  --p4:#993C1D;--p4-bg:#FAECE7;
+  --p5:#993556;--p5-bg:#FBEAF0;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1c;--bg2:#252525;--bg3:#2f2f2f;
+    --text:#f0f0f0;--muted:#888;--hint:#555;
+    --border:#333;--border2:#444;
+    --critical-bg:#3b1a1a;--ok-bg:#1a2e10;
+    --p1-bg:#0d2340;--p2-bg:#2e1c05;--p3-bg:#152708;--p4-bg:#2e1408;--p5-bg:#2e0f1c;
+  }
+}
+body{font-family:var(--font);background:var(--bg3);color:var(--text);min-height:100vh}
+
+/* ── Upload Screen ── */
+#upload-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:40px 20px;gap:0}
+.upload-card{background:var(--bg);border:.5px solid var(--border2);border-radius:16px;padding:48px 48px 40px;max-width:560px;width:100%;display:flex;flex-direction:column;align-items:center;gap:0;box-shadow:0 4px 24px rgba(0,0,0,.07)}
+.upload-logo{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--muted);letter-spacing:-.2px;margin-bottom:32px;display:flex;align-items:center;gap:8px}
+.upload-logo-dot{width:8px;height:8px;border-radius:50%;background:#0D1B2A}
+.upload-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:8px;text-align:center}
+.upload-sub{font-size:13px;color:var(--muted);text-align:center;line-height:1.6;margin-bottom:32px}
+.drop-zone{width:100%;border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:12px;cursor:pointer;transition:all .2s;background:var(--bg2)}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--accent);background:var(--p1-bg)}
+.drop-icon{width:44px;height:44px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:20px}
+.drop-text{font-size:13px;color:var(--muted);text-align:center;line-height:1.5}
+.drop-text strong{color:var(--text);font-weight:500}
+.drop-formats{font-size:11px;color:var(--hint);margin-top:2px}
+.upload-or{font-size:11px;color:var(--hint);margin:16px 0;text-transform:uppercase;letter-spacing:.8px}
+.browse-btn{font-family:var(--font);font-size:13px;font-weight:500;height:40px;padding:0 24px;border-radius:var(--radius);border:.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer;transition:all .15s}
+.browse-btn:hover{background:var(--bg2);border-color:var(--accent);color:var(--accent)}
+#file-input{display:none}
+.upload-hints{margin-top:28px;width:100%;display:flex;flex-direction:column;gap:8px}
+.hint-row{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--muted);line-height:1.5}
+.hint-dot{width:5px;height:5px;border-radius:50%;background:var(--border2);margin-top:6px;flex-shrink:0}
+.parse-error{background:var(--critical-bg);color:var(--critical);border-radius:var(--radius);padding:10px 14px;font-size:12px;margin-top:16px;width:100%;display:none}
+.loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:999;display:none}
+.loading-box{background:var(--bg);border-radius:var(--radius-lg);padding:32px 40px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.spinner{width:28px;height:28px;border:2.5px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:13px;color:var(--muted);font-family:var(--mono)}
+
+/* ── App Screen ── */
+#app-screen{display:none;flex-direction:column;height:100vh;background:var(--bg)}
+.topbar{display:flex;align-items:center;gap:0;background:#0D1B2A;padding:0 16px;height:46px;flex-shrink:0}
+.topbar-logo{font-family:var(--mono);font-size:13px;font-weight:500;color:#fff;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}
+.topbar-logo-dot{width:7px;height:7px;border-radius:50%;background:#378ADD}
+.topbar-meta{margin-left:16px;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.topbar-tag{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.55);font-family:var(--mono)}
+.new-file-btn{font-family:var(--font);font-size:11px;height:26px;padding:0 10px;border-radius:var(--radius);border:.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);cursor:pointer;transition:all .15s}
+.new-file-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+
+.toolbar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--bg);border-bottom:.5px solid var(--border2);flex-wrap:wrap}
+select,input[type=text]{font-family:var(--font);font-size:12px;height:32px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text);padding:0 10px;outline:none;cursor:pointer}
+select:focus,input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,138,221,.15)}
+input[type=text]{width:200px}
+input[type=text]::placeholder{color:var(--hint)}
+.badge-btn{font-family:var(--font);font-size:11px;font-weight:500;height:28px;padding:0 12px;border-radius:20px;border:.5px solid var(--border2);background:var(--bg2);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.badge-btn.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.badge-btn:hover:not(.active){background:var(--bg3)}
+.phase-bar{display:flex;gap:6px;padding:8px 16px;background:var(--bg2);border-bottom:.5px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0}
+.stat-bar{display:flex;border-bottom:.5px solid var(--border2);background:var(--bg2);flex-shrink:0}
+.stat{display:flex;flex-direction:column;align-items:center;padding:10px 20px;flex:1;border-right:.5px solid var(--border)}
+.stat:last-child{border-right:none}
+.stat-val{font-family:var(--mono);font-size:20px;font-weight:500;line-height:1}
+.stat-lbl{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.5px;text-transform:uppercase}
+.stat.crit .stat-val{color:var(--critical)}
+.stat.ok-s .stat-val{color:var(--ok)}
+.timeline-strip{display:flex;height:5px;flex-shrink:0}
+.tstrip-seg{height:100%}
+.main{display:flex;flex:1;overflow:hidden;min-height:0}
+.table-wrap{flex:1;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{position:sticky;top:0;z-index:2;background:var(--bg);padding:8px 10px;text-align:left;font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;border-bottom:.5px solid var(--border2);white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:var(--text)}
+.sort-icon{margin-left:3px;opacity:.4}
+thead th.sorted .sort-icon{opacity:1}
+tbody tr{border-bottom:.5px solid var(--border);cursor:pointer;transition:background .1s}
+tbody tr:hover{background:var(--bg2)}
+tbody tr.selected{background:var(--bg3)!important}
+td{padding:7px 10px;vertical-align:top}
+td.id-col{font-family:var(--mono);font-size:11px;color:var(--muted);width:44px}
+td.ts-col{font-family:var(--mono);font-size:10px;white-space:nowrap;color:var(--muted)}
+td.msg-col{font-size:11px;line-height:1.4;max-width:400px}
+td.sev-col{width:74px}
+.sev-pill{display:inline-block;font-size:10px;font-weight:500;padding:2px 7px;border-radius:10px;white-space:nowrap}
+.sev-critical{background:var(--critical-bg);color:var(--critical)}
+.sev-ok{background:var(--ok-bg);color:var(--ok)}
+.sev-warning{background:#FAEEDA;color:#854F0B}
+.phase-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle;flex-shrink:0}
+.ph1{background:var(--p1)}.ph2{background:var(--p2)}.ph3{background:var(--p3)}.ph4{background:var(--p4)}.ph5{background:var(--p5)}.ph-gen{background:var(--muted)}
+.detail-panel{width:360px;border-left:.5px solid var(--border2);background:var(--bg);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+.detail-header{padding:12px 14px;border-bottom:.5px solid var(--border2);display:flex;align-items:center;justify-content:space-between}
+.detail-header h3{font-size:12px;font-weight:500;color:var(--text);font-family:var(--mono)}
+.detail-close{width:22px;height:22px;border-radius:50%;border:.5px solid var(--border2);background:var(--bg2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)}
+.detail-close:hover{background:var(--bg3)}
+.detail-body{padding:14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px}
+.detail-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:40px;text-align:center}
+.detail-empty-icon{font-size:36px;opacity:.15}
+.detail-empty-text{font-size:12px;color:var(--hint);line-height:1.6}
+.detail-field{display:flex;flex-direction:column;gap:3px}
+.detail-label{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.detail-value{font-size:12px;color:var(--text);line-height:1.5}
+.detail-value.mono{font-family:var(--mono);font-size:11px;word-break:break-all}
+.detail-value.highlight{background:var(--bg2);border-radius:var(--radius);padding:8px 10px;border:.5px solid var(--border);font-size:11px;line-height:1.6;word-break:break-word}
+.detail-value.rel{background:var(--p1-bg);border-radius:var(--radius);padding:8px 10px;border:.5px solid #B5D4F4;font-size:11px;line-height:1.6;color:#0C447C}
+.phase-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:500;padding:3px 8px;border-radius:10px;white-space:nowrap}
+.ph1-badge{background:var(--p1-bg);color:var(--p1)}.ph2-badge{background:var(--p2-bg);color:var(--p2)}
+.ph3-badge{background:var(--p3-bg);color:var(--p3)}.ph4-badge{background:var(--p4-bg);color:var(--p4)}
+.ph5-badge{background:var(--p5-bg);color:var(--p5)}.ph-gen-badge{background:var(--bg2);color:var(--muted)}
+.no-results{padding:60px;text-align:center;color:var(--hint);font-size:13px}
+.count-label{font-size:11px;color:var(--muted);margin-left:auto;font-family:var(--mono)}
+.export-btn{font-family:var(--font);font-size:11px;height:30px;padding:0 12px;border-radius:var(--radius);border:.5px solid var(--border2);background:var(--bg);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.export-btn:hover{background:var(--bg2);color:var(--text)}
+.server-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;padding:2px 9px;border-radius:10px;font-weight:500}
+.server-badge.online{background:#EAF3DE;color:#3B6D11;border:.5px solid #C0DD97}
+.server-badge.offline{background:#FEF9E7;color:#854F0B;border:.5px solid #FAC775}
+.server-badge .sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;display:inline-block}
+.server-badge.online .sdot{background:#639922}
+.server-badge.offline .sdot{background:#BA7517}
+.xlsx-btn{font-family:var(--font);font-size:11px;height:30px;padding:0 12px;border-radius:var(--radius);border:.5px solid #C0DD97;background:#EAF3DE;color:#3B6D11;cursor:pointer;font-weight:500;white-space:nowrap;transition:all .15s}
+.xlsx-btn:hover{background:#D5F0C3}
+.xlsx-btn:disabled{opacity:.5;cursor:not-allowed}
+.sep{width:.5px;height:20px;background:var(--border2);flex-shrink:0}
+@media(max-width:900px){.detail-panel{display:none}}
+@media(max-width:600px){input[type=text]{width:140px}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ UPLOAD SCREEN ═══════════════ -->
+<div id="upload-screen">
+  <div class="upload-card">
+    <div class="upload-logo"><div class="upload-logo-dot"></div> BMC SEL Analyzer</div>
+    <div class="upload-title">上傳 BMC Event Log</div>
+    <div class="upload-sub">支援 Redfish EventLog JSON 格式（透過 curl 或 mfg-tool 匯出的 .log / .json 檔案）</div>
+
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="drop-icon">&#128196;</div>
+      <div class="drop-text"><strong>拖曳檔案到這裡</strong><br>或點擊選擇檔案</div>
+      <div class="drop-formats">.log &nbsp;·&nbsp; .json &nbsp;·&nbsp; .txt</div>
+    </div>
+    <div class="upload-or">或</div>
+    <button class="browse-btn" onclick="document.getElementById('file-input').click()">選擇檔案...</button>
+    <input type="file" id="file-input" accept=".log,.json,.txt" onchange="handleFileSelect(this.files[0])">
+
+    <div class="parse-error" id="parse-error"></div>
+
+    <div class="upload-hints">
+      <div class="hint-row"><div class="hint-dot"></div><span>支援 Redfish <code style="font-size:11px;background:var(--bg2);padding:1px 4px;border-radius:3px">/LogServices/EventLog/Entries</code> API 回應格式</span></div>
+      <div class="hint-row"><div class="hint-dot"></div><span>支援含有 HTTP header 的原始 curl 輸出（自動跳過非 JSON 內容）</span></div>
+      <div class="hint-row"><div class="hint-dot"></div><span>所有資料僅在本機瀏覽器處理，不會上傳至任何伺服器</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ LOADING ═══════════════ -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loading-text">解析中...</div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP SCREEN ═══════════════ -->
+<div id="app-screen">
+  <div class="topbar">
+    <div class="topbar-logo"><div class="topbar-logo-dot"></div> BMC SEL Analyzer</div>
+    <div class="topbar-meta" id="topbar-meta"></div>
+    <div class="topbar-right">
+      <span class="topbar-tag" id="topbar-host"></span>
+      <span class="topbar-tag" id="topbar-date"></span>
+      <button class="new-file-btn" onclick="resetToUpload()">&#8593; 換檔案</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="&#128269; 搜尋 Message..." oninput="applyFilters()">
+    <div class="sep"></div>
+    <select id="sev-filter" onchange="applyFilters()">
+      <option value="">所有嚴重性</option>
+      <option value="Critical">Critical</option>
+      <option value="Warning">Warning</option>
+      <option value="OK">OK</option>
+    </select>
+    <select id="phase-filter" onchange="applyFilters()">
+      <option value="">所有 Phase</option>
+    </select>
+    <select id="cat-filter" onchange="applyFilters()">
+      <option value="">所有 Category</option>
+    </select>
+    <span class="count-label" id="count-label">-</span>
+    <button class="export-btn" onclick="exportCSVFallback()" id="csv-btn">&#8595; CSV</button>
+    <button class="xlsx-btn" onclick="exportExcel()" id="export-btn">&#8595; 匯出 Excel (.xlsx)</button>
+    <span class="server-badge offline" id="server-badge"><span class="sdot"></span><span id="srv-lbl">Server 離線</span></span>
+  </div>
+
+  <div class="phase-bar" id="phase-bar"></div>
+
+  <div class="stat-bar">
+    <div class="stat"><span class="stat-val" id="s-total">-</span><span class="stat-lbl">Total</span></div>
+    <div class="stat crit"><span class="stat-val" id="s-crit">-</span><span class="stat-lbl">Critical</span></div>
+    <div class="stat ok-s"><span class="stat-val" id="s-ok">-</span><span class="stat-lbl">OK</span></div>
+    <div class="stat"><span class="stat-val" id="s-unres">-</span><span class="stat-lbl">Unresolved</span></div>
+  </div>
+
+  <div class="timeline-strip" id="timeline-strip"></div>
+
+  <div class="main">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('id')" class="sorted">ID <span class="sort-icon" id="sort-id">↑</span></th>
+            <th onclick="sortBy('ts')">Timestamp (UTC) <span class="sort-icon" id="sort-ts"></span></th>
+            <th onclick="sortBy('sev')">Severity <span class="sort-icon" id="sort-sev"></span></th>
+            <th onclick="sortBy('phase')">Phase <span class="sort-icon" id="sort-phase"></span></th>
+            <th>Message</th>
+            <th onclick="sortBy('cat')">Category <span class="sort-icon" id="sort-cat"></span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="no-results" id="no-results" style="display:none">沒有符合條件的事件。</div>
+    </div>
+    <div class="detail-panel">
+      <div class="detail-header">
+        <h3>Event detail</h3>
+        <div class="detail-close" onclick="closeDetail()">&#10005;</div>
+      </div>
+      <div class="detail-body" id="detail-body">
+        <div class="detail-empty">
+          <div class="detail-empty-icon">&#9634;</div>
+          <div class="detail-empty-text">點擊任一列查看完整事件詳情與關聯分析。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// FILE HANDLING
+// ═══════════════════════════════════════════════════
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]); });
+
+// ── Server detection ──────────────────────────────────────────
+const SERVER_URL = 'http://localhost:5000';
+let serverOnline = false;
+let currentFile  = null;
+
+async function checkServer() {
+  try {
+    const r = await fetch(SERVER_URL + '/parse', {
+      method: 'POST', body: new FormData(),
+      signal: AbortSignal.timeout(1500)
+    });
+    serverOnline = true;
+  } catch(e) {
+    serverOnline = (e.name !== 'TypeError' && e.name !== 'AbortError' && !e.message.includes('fetch'));
+    if (e.message && (e.message.includes('400') || e.message.includes('422'))) serverOnline = true;
+  }
+  const badge = document.getElementById('server-badge');
+  const lbl   = document.getElementById('srv-lbl');
+  const xbtn  = document.getElementById('export-btn');
+  if (serverOnline) {
+    badge.className = 'server-badge online';
+    lbl.textContent = 'Server 在線 — 支援格式化 Excel';
+    if (xbtn) xbtn.title = '產生與第一次相同格式的 Excel';
+  } else {
+    badge.className = 'server-badge offline';
+    lbl.textContent = 'Server 離線 — 僅支援 CSV 匯出';
+    if (xbtn) xbtn.title = '請先執行 python3 bmc_sel_server.py';
+  }
+  return serverOnline;
+}
+setInterval(checkServer, 4000);
+checkServer();
+
+function handleFileSelect(file) {
+  if (!file) return;
+  currentFile = file;
+  if (serverOnline) {
+    handleFileViaServer(file);
+  } else {
+    handleFileLocal(file);
+  }
+}
+
+async function handleFileViaServer(file) {
+  showLoading('上傳至本機 Server 解析中...');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(SERVER_URL + '/parse', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || '解析失敗');
+    if (!data.events || data.events.length === 0) throw new Error('未找到任何 Event Log 記錄。');
+    showLoading('建立分析畫面...');
+    setTimeout(() => { initApp(data.events, file.name); hideLoading(); }, 50);
+  } catch(err) {
+    hideLoading();
+    // Fallback to local parse
+    handleFileLocal(file);
+  }
+}
+
+function handleFileLocal(file) {
+  showLoading('讀取檔案中...');
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      showLoading('解析 JSON...');
+      setTimeout(() => {
+        try {
+          const events = parseLog(e.target.result, file.name);
+          if (!events || events.length === 0) throw new Error('未找到任何 Event Log 記錄，請確認檔案格式。');
+          showLoading('分析事件關聯...');
+          setTimeout(() => {
+            try { initApp(events, file.name); hideLoading(); }
+            catch(err2) { showError(err2.message); }
+          }, 50);
+        } catch(err) { showError(err.message); }
+      }, 50);
+    } catch(err) { showError(err.message); }
+  };
+  reader.onerror = () => showError('檔案讀取失敗。');
+  reader.readAsText(file, 'utf-8');
+}
+
+// ═══════════════════════════════════════════════════
+// LOG PARSER
+// ═══════════════════════════════════════════════════
+function parseLog(raw, filename) {
+  const events = [];
+
+  // Strategy 1: find all JSON objects in the file that look like Redfish EventLog responses
+  const jsonBlocks = extractJsonBlocks(raw);
+
+  for (const block of jsonBlocks) {
+    try {
+      const obj = JSON.parse(block);
+      // Redfish EventLog collection format
+      if (obj.Members && Array.isArray(obj.Members)) {
+        for (const m of obj.Members) {
+          if (m.Created || m.Message) events.push(normalizeRedfishEntry(m));
+        }
+        if (events.length > 0) return events;
+      }
+      // Direct array of entries
+      if (Array.isArray(obj)) {
+        for (const m of obj) {
+          if (m.Created || m.Message) events.push(normalizeRedfishEntry(m));
+        }
+        if (events.length > 0) return events;
+      }
+      // mfg-tool style: { "1": {...}, "2": {...} }
+      if (typeof obj === 'object' && !Array.isArray(obj)) {
+        const keys = Object.keys(obj).filter(k => /^\d+$/.test(k));
+        if (keys.length > 0) {
+          for (const k of keys) {
+            const entry = obj[k];
+            if (entry.timestamp || entry.message || entry.severity) {
+              events.push(normalizeMfgEntry(k, entry));
+            }
+          }
+          if (events.length > 0) return events;
+        }
+      }
+    } catch(e) { /* try next block */ }
+  }
+
+  // Strategy 2: extract REDFISH_EVENT embedded strings
+  const embeddedEvents = extractEmbeddedRedfishEvents(raw);
+  if (embeddedEvents.length > 0) return embeddedEvents;
+
+  // Strategy 3: line-by-line JSON objects
+  const lineEvents = parseLineByLine(raw);
+  if (lineEvents.length > 0) return lineEvents;
+
+  throw new Error('無法解析此檔案格式。請確認是否為 Redfish EventLog JSON 格式（/LogServices/EventLog/Entries）或 mfg-tool log-display 格式。');
+}
+
+function extractJsonBlocks(raw) {
+  const blocks = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (esc) { esc = false; continue; }
+    if (c === '\\' && inStr) { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '{' || c === '[') { if (depth === 0) start = i; depth++; }
+    else if (c === '}' || c === ']') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        blocks.push(raw.substring(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return blocks;
+}
+
+function extractEmbeddedRedfishEvents(raw) {
+  const events = [];
+  // Match REDFISH_EVENT embedded JSON strings with unescaped inner quotes (malformed)
+  const re = /"REDFISH_EVENT"\s*:\s*"(\{[^]*?)(?="\s*,\s*"[a-z_]+"|\"\s*\})/g;
+  let m;
+  while ((m = re.exec(raw)) !== null) {
+    try {
+      const inner = m[1].replace(/\\"/g, '"');
+      const idM = inner.match(/"Id"\s*:\s*"(\d+)"/);
+      const msgM = inner.match(/"Message"\s*:\s*"([^"]+)"/);
+      const tsM = inner.match(/"Created"\s*:\s*"([^"]+)"/);
+      const sevM = inner.match(/"Severity"\s*:\s*"([^"]+)"/);
+      const midM = inner.match(/"MessageId"\s*:\s*"([^"]+)"/);
+      if (idM || msgM) {
+        events.push({
+          id: idM ? parseInt(idM[1]) : events.length + 1,
+          ts: tsM ? tsM[1] : '',
+          sev: sevM ? sevM[1] : 'OK',
+          msg: msgM ? msgM[1] : '',
+          msgid: midM ? midM[1] : '',
+          resolved: false,
+          resolution: 'N/A',
+        });
+      }
+    } catch(e) {}
+  }
+  return events;
+}
+
+function parseLineByLine(raw) {
+  const events = [];
+  const lines = raw.split('\n');
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t.startsWith('{')) continue;
+    try {
+      const obj = JSON.parse(t);
+      if (obj.Created || obj.Message) events.push(normalizeRedfishEntry(obj));
+    } catch(e) {}
+  }
+  return events;
+}
+
+function normalizeRedfishEntry(m) {
+  return {
+    id: parseInt(m.Id) || 0,
+    ts: m.Created || m.Modified || '',
+    sev: m.Severity || 'OK',
+    msg: m.Message || '',
+    msgid: m.MessageId || '',
+    resolved: m.Resolved === true || m.Resolved === 'true',
+    resolution: m.Resolution || 'N/A',
+    msgArgs: m.MessageArgs || [],
+  };
+}
+
+function normalizeMfgEntry(key, entry) {
+  const r = entry.redfish || {};
+  return {
+    id: parseInt(key),
+    ts: entry.timestamp || entry.updated_timestamp || '',
+    sev: mapMfgSeverity(entry.severity || ''),
+    msg: r.message || entry.message || '',
+    msgid: r.id || entry.event_id || '',
+    resolved: entry.resolved === true,
+    resolution: entry.resolution || 'N/A',
+    msgArgs: r.args || [],
+  };
+}
+
+function mapMfgSeverity(s) {
+  if (!s) return 'OK';
+  const lower = s.toLowerCase();
+  if (lower.includes('critical') || lower.includes('error') || lower.includes('alert') || lower.includes('emergency')) return 'Critical';
+  if (lower.includes('warning')) return 'Warning';
+  return 'OK';
+}
+
+// ═══════════════════════════════════════════════════
+// CATEGORIZATION & PHASE DETECTION
+// ═══════════════════════════════════════════════════
+function categorize(msg, msgid) {
+  const m = (msg || '').toLowerCase();
+  const mid = (msgid || '').toLowerCase();
+  if (m.includes('cleared') || mid.includes('cleared')) return 'Log Cleared';
+  if (m.includes('poweronreset') || m.includes('power on reset')) return 'Power On Reset';
+  if (m.includes('bmcstate.ready') || mid.includes('statebmc')) return 'BMC Ready';
+  if (m.includes('host0 state is on') || m.includes('host state is on')) return 'Host Power On';
+  if (m.includes('bmc firmware rebooted') || m.includes('bmc boot')) return 'BMC Reboot';
+  if (m.includes('threshold') || m.includes('temp') || m.includes('temperature') || mid.includes('sensor')) return 'Thermal / Sensor Alert';
+  if (m.includes('debug token')) return 'FW Update - Debug Token';
+  if (m.includes('being trans') || m.includes('will be updated with image')) return 'FW Update - Image Transfer';
+  if (m.includes('update operation') && (m.includes('completed') || m.includes('failed'))) return 'FW Update - Operation';
+  if ((m.includes('successfully') || m.includes('success')) && (m.includes('fmc') || m.includes('fw_') || m.includes('sbios') || m.includes('updated'))) return 'FW Update - Success';
+  if (m.includes('awaiting') && m.includes('action')) return 'FW Update - Awaiting Action';
+  if (m.includes('pscbl') || /0x[b][01]c1c/.test(m)) return 'PSCBL Firmware Error';
+  if (mid.includes('unexpectedexception') || m.includes('unexpectedexception')) return 'BMC Exception';
+  if (m.includes('health of resource') || m.includes('health changed')) return 'CPU Health Change';
+  if (m.includes('resource property')) return 'CPU Resource Property Change';
+  if (m.includes('cper') || m.includes('nvid')) return 'CPER Event';
+  if (m.includes('firmware') || m.includes('update') || m.includes('flash') || mid.includes('update')) return 'Firmware Event';
+  if (m.includes('power') || mid.includes('power')) return 'Power Event';
+  if (m.includes('network') || m.includes('nic') || m.includes('ethernet')) return 'Network Event';
+  if (m.includes('memory') || m.includes('dimm') || m.includes('dram')) return 'Memory Event';
+  if (m.includes('drive') || m.includes('disk') || m.includes('nvme') || m.includes('storage')) return 'Storage Event';
+  if (m.includes('fan')) return 'Thermal / Fan Event';
+  if (m.includes('voltage') || m.includes('psu') || m.includes('power supply')) return 'Power Supply Event';
+  return 'Other';
+}
+
+function detectPhases(events) {
+  // Auto-detect phases from event stream patterns
+  // Returns array of {name, label, start_idx, end_idx, color, bg}
+  const phases = [];
+  const COLORS = ['#185FA5','#854F0B','#3B6D11','#993C1D','#993556','#534AB7','#0F6E56','#D85A30'];
+  const BGS   = ['#E6F1FB','#FAEEDA','#EAF3DE','#FAECE7','#FBEAF0','#EEEDFE','#E1F5EE','#FAECE7'];
+
+  // Group events into time windows (gaps > 30s start a new potential phase)
+  const windows = [];
+  let winStart = 0;
+  for (let i = 1; i < events.length; i++) {
+    const prev = parseTimestamp(events[i-1].ts);
+    const curr = parseTimestamp(events[i].ts);
+    if (prev && curr && (curr - prev) > 60000) { // 60s gap
+      windows.push({start: winStart, end: i-1});
+      winStart = i;
+    }
+  }
+  windows.push({start: winStart, end: events.length-1});
+
+  // Label each window by dominant category
+  windows.forEach((w, idx) => {
+    const slice = events.slice(w.start, w.end+1);
+    const cats = {};
+    slice.forEach(e => { cats[e.cat] = (cats[e.cat]||0)+1; });
+    const dom = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
+    const label = dom ? dom[0] : 'Events';
+    const pn = `Phase ${idx+1}`;
+    const ci = idx % COLORS.length;
+    phases.push({name: pn, label: `${pn}: ${label}`, color: COLORS[ci], bg: BGS[ci], startIdx: w.start, endIdx: w.end});
+  });
+
+  // If only 1 window, just use it as-is
+  return phases;
+}
+
+function parseTimestamp(ts) {
+  if (!ts) return null;
+  try { return new Date(ts.replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?(\+\d{2}:\d{2}|Z)?$/, '$1Z')).getTime(); } catch(e) { return null; }
+}
+
+function assignPhases(events) {
+  if (events.length === 0) return events;
+  const phases = detectPhases(events);
+  events.forEach((e, i) => {
+    const ph = phases.find(p => i >= p.startIdx && i <= p.endIdx);
+    e.phase = ph ? ph.name : 'Phase 1';
+    e.phaseLabel = ph ? ph.label : 'Phase 1';
+    e.phaseColor = ph ? ph.color : '#888';
+    e.phaseBg = ph ? ph.bg : '#f0f0f0';
+  });
+  return { events, phases };
+}
+
+function buildRelationship(e, allEvents) {
+  const cat = e.cat;
+  if (cat === 'Log Cleared') return 'Starting point — clears prior event history.';
+  if (cat === 'Power On Reset') return 'System power-on reset event. Triggers subsequent BMC Ready and Host Power On events.';
+  if (cat === 'BMC Ready') return 'BMC firmware has finished booting and reached Ready state. Follows a Power On Reset or reboot event.';
+  if (cat === 'Host Power On') return 'Host system powered on. Triggers post-boot health assessments and sensor monitoring.';
+  if (cat === 'BMC Reboot') return 'BMC firmware rebooted — typically follows a firmware update that requires a reset.';
+  if (cat === 'Thermal / Sensor Alert') return 'Sensor reading exceeds threshold. Requires physical inspection of cooling system.';
+  if (cat === 'FW Update - Image Transfer') return 'Firmware image transfer initiated. Part of: Image Transfer → Operation → Success chain.';
+  if (cat === 'FW Update - Operation') return 'Firmware flash operation in progress. Follows Image Transfer; leads to Success or failure.';
+  if (cat === 'FW Update - Success') return 'Firmware component successfully updated. Part of the FW Update chain completion.';
+  if (cat === 'FW Update - Awaiting Action') return 'System awaiting operator action (typically a reset) to apply the firmware update.';
+  if (cat === 'FW Update - Debug Token') return 'Debug token operation. Precedes the main firmware update sequence.';
+  if (cat === 'PSCBL Firmware Error') return 'PSCBL firmware fault detected on GPU package. Fires repeatedly when hardware issue persists. Correlates with BMC UnexpectedException events.';
+  if (cat === 'BMC Exception') return 'BMC-level exception — typically a downstream reflection of a hardware fault (e.g. PSCBL error) detected by the BMC Redfish client.';
+  if (cat === 'CPU Health Change') return 'CPU/processor resource health status changed. Common during post-boot re-assessment or when hardware faults are detected.';
+  if (cat === 'CPU Resource Property Change') return 'CPU resource property updated. Often paired with CPU Health Change events during initialization.';
+  if (cat === 'CPER Event') return 'Common Platform Error Record (CPER) — hardware error report from firmware/BIOS level.';
+  return 'General system event. Review message and timestamp for context.';
+}
+
+// ═══════════════════════════════════════════════════
+// APP INIT
+// ═══════════════════════════════════════════════════
+let ALL_EVENTS = [], filteredEvents = [], allPhases = [];
+let sortField = 'id', sortDir = 1, selectedId = null;
+
+function initApp(rawEvents, filename) {
+  // Sort by id then ts
+  rawEvents.sort((a,b) => (a.id||0) - (b.id||0) || (a.ts||'').localeCompare(b.ts||''));
+
+  // Assign categories
+  rawEvents.forEach(e => { e.cat = categorize(e.msg, e.msgid); });
+
+  // Assign phases
+  const result = assignPhases(rawEvents);
+  ALL_EVENTS = result.events;
+  allPhases = result.phases;
+
+  // Assign relationships
+  ALL_EVENTS.forEach(e => { e.rel = buildRelationship(e, ALL_EVENTS); });
+
+  // Extract metadata
+  const host = extractHost(filename, ALL_EVENTS);
+  const dateRange = extractDateRange(ALL_EVENTS);
+
+  // Update topbar
+  document.getElementById('topbar-meta').textContent = filename;
+  document.getElementById('topbar-host').textContent = host || 'BMC';
+  document.getElementById('topbar-date').textContent = dateRange;
+
+  // Populate filters
+  populateFilters();
+
+  // Show app
+  document.getElementById('upload-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'flex';
+
+  filteredEvents = [...ALL_EVENTS];
+  renderPhaseBar();
+  applyFilters();
+}
+
+function extractHost(filename, events) {
+  const ipRe = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/;
+  const m = filename.match(ipRe);
+  if (m) return m[1];
+  for (const e of events) {
+    const mm = (e.msg||'').match(ipRe) || (e.msgid||'').match(ipRe);
+    if (mm) return mm[1];
+  }
+  return '';
+}
+
+function extractDateRange(events) {
+  const tss = events.map(e => e.ts).filter(Boolean).sort();
+  if (!tss.length) return '';
+  const first = tss[0].substring(0,10);
+  const last = tss[tss.length-1].substring(0,10);
+  return first === last ? first : `${first} ~ ${last}`;
+}
+
+function populateFilters() {
+  // Phase filter
+  const pf = document.getElementById('phase-filter');
+  pf.innerHTML = '<option value="">所有 Phase</option>';
+  allPhases.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.name; o.textContent = p.label;
+    pf.appendChild(o);
+  });
+
+  // Category filter
+  const cf = document.getElementById('cat-filter');
+  cf.innerHTML = '<option value="">所有 Category</option>';
+  const cats = [...new Set(ALL_EVENTS.map(e=>e.cat))].sort();
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    cf.appendChild(o);
+  });
+}
+
+function renderPhaseBar() {
+  const bar = document.getElementById('phase-bar');
+  bar.innerHTML = '<span style="font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.5px;text-transform:uppercase;margin-right:4px">Phase</span>';
+  const all = document.createElement('button');
+  all.className = 'badge-btn active'; all.setAttribute('data-phase','');
+  all.textContent = 'All'; all.onclick = () => setPhase(all, '');
+  bar.appendChild(all);
+  allPhases.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'badge-btn'; btn.setAttribute('data-phase', p.name);
+    btn.textContent = p.label.substring(0,28); btn.title = p.label;
+    btn.style.cssText = `border-color:${p.color}40;color:${p.color}`;
+    btn.onclick = () => setPhase(btn, p.name);
+    bar.appendChild(btn);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// TABLE RENDERING
+// ═══════════════════════════════════════════════════
+function phaseInfo(phaseName) {
+  return allPhases.find(p => p.name === phaseName) || {color:'#888',bg:'#f0f0f0',label:phaseName};
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderTable() {
+  const tbody = document.getElementById('tbody');
+  const noResults = document.getElementById('no-results');
+  if (filteredEvents.length === 0) { tbody.innerHTML=''; noResults.style.display='block'; updateStats(); renderTimeline(); return; }
+  noResults.style.display = 'none';
+  tbody.innerHTML = filteredEvents.map(e => {
+    const pi = phaseInfo(e.phase);
+    const tsShort = (e.ts||'').replace(/^\d{4}-\d{2}-\d{2}T/,'').replace(/\+\d{2}:\d{2}$/,'').replace(/Z$/,'').substring(0,15);
+    const phNum = (e.phase||'').replace(/\D/g,'').substring(0,1);
+    return `<tr onclick="selectRow(${e.id})" class="${selectedId===e.id?'selected':''}">
+      <td class="id-col">${e.id}</td>
+      <td class="ts-col">${escHtml(tsShort)}</td>
+      <td class="sev-col"><span class="sev-pill sev-${(e.sev||'ok').toLowerCase()}">${escHtml(e.sev)}</span></td>
+      <td><span class="phase-dot" style="background:${pi.color}"></span><span style="font-size:11px;color:var(--muted)">P${phNum}</span></td>
+      <td class="msg-col">${escHtml((e.msg||'').length>95?(e.msg||'').substring(0,95)+'…':(e.msg||''))}</td>
+      <td style="font-size:10px;color:var(--muted);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis">${escHtml(e.cat)}</td>
+    </tr>`;
+  }).join('');
+  updateStats(); renderTimeline();
+}
+
+function updateStats() {
+  document.getElementById('s-total').textContent = filteredEvents.length;
+  document.getElementById('s-crit').textContent = filteredEvents.filter(e=>e.sev==='Critical').length;
+  document.getElementById('s-ok').textContent = filteredEvents.filter(e=>e.sev==='OK').length;
+  document.getElementById('s-unres').textContent = filteredEvents.filter(e=>!e.resolved).length;
+  document.getElementById('count-label').textContent = filteredEvents.length + ' 筆事件';
+}
+
+function renderTimeline() {
+  const strip = document.getElementById('timeline-strip');
+  const total = filteredEvents.length;
+  if (total === 0) { strip.innerHTML=''; return; }
+  const pc = {};
+  filteredEvents.forEach(e => { pc[e.phase] = (pc[e.phase]||0)+1; });
+  strip.innerHTML = allPhases.map(p => {
+    const cnt = pc[p.name]||0; if (!cnt) return '';
+    const pct = (cnt/total*100).toFixed(1);
+    return `<div class="tstrip-seg" style="width:${pct}%;background:${p.color};opacity:.75" title="${p.label}: ${cnt} 筆"></div>`;
+  }).join('');
+}
+
+function selectRow(id) {
+  selectedId = id;
+  const e = ALL_EVENTS.find(x=>x.id===id);
+  if (!e) return;
+  document.querySelectorAll('tbody tr').forEach(r=>r.classList.remove('selected'));
+  const idx = filteredEvents.findIndex(x=>x.id===id);
+  const rows = document.querySelectorAll('tbody tr');
+  if (idx>=0 && rows[idx]) rows[idx].classList.add('selected');
+  const pi = phaseInfo(e.phase);
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-field"><div class="detail-label">ID / Timestamp</div><div class="detail-value mono">#${e.id}&nbsp;&nbsp;${escHtml(e.ts)}</div></div>
+    <div class="detail-field"><div class="detail-label">Severity</div><div><span class="sev-pill sev-${(e.sev||'ok').toLowerCase()}">${escHtml(e.sev)}</span></div></div>
+    <div class="detail-field"><div class="detail-label">Phase</div><div><span class="phase-badge" style="background:${pi.bg};color:${pi.color}"><span class="phase-dot" style="background:${pi.color};margin-right:5px"></span>${escHtml(pi.label||e.phase)}</span></div></div>
+    <div class="detail-field"><div class="detail-label">Category</div><div class="detail-value">${escHtml(e.cat)}</div></div>
+    <div class="detail-field"><div class="detail-label">Message</div><div class="detail-value highlight">${escHtml(e.msg||'')}</div></div>
+    ${e.msgid?`<div class="detail-field"><div class="detail-label">MessageId</div><div class="detail-value mono">${escHtml(e.msgid)}</div></div>`:''}
+    <div class="detail-field"><div class="detail-label">Resolved</div><div class="detail-value">${e.resolved?'Yes':'No — unresolved'}</div></div>
+    ${e.resolution&&e.resolution!=='N/A'?`<div class="detail-field"><div class="detail-label">Resolution Note</div><div class="detail-value">${escHtml(e.resolution)}</div></div>`:''}
+    <div class="detail-field"><div class="detail-label">Event Relationship</div><div class="detail-value rel">${escHtml(e.rel)}</div></div>`;
+}
+
+function closeDetail() {
+  selectedId = null;
+  document.querySelectorAll('tbody tr').forEach(r=>r.classList.remove('selected'));
+  document.getElementById('detail-body').innerHTML = '<div class="detail-empty"><div class="detail-empty-icon">&#9634;</div><div class="detail-empty-text">點擊任一列查看完整事件詳情與關聯分析。</div></div>';
+}
+
+function applyFilters() {
+  const q = (document.getElementById('search').value||'').toLowerCase();
+  const sev = document.getElementById('sev-filter').value;
+  const phase = document.getElementById('phase-filter').value;
+  const cat = document.getElementById('cat-filter').value;
+  filteredEvents = ALL_EVENTS.filter(e =>
+    (!q || (e.msg||'').toLowerCase().includes(q) || (e.cat||'').toLowerCase().includes(q) || String(e.id).includes(q) || (e.msgid||'').toLowerCase().includes(q)) &&
+    (!sev || e.sev === sev) &&
+    (!phase || e.phase === phase) &&
+    (!cat || e.cat === cat)
+  );
+  if (sortField) doSort(); else renderTable();
+}
+
+function setPhase(btn, phase) {
+  document.querySelectorAll('.badge-btn[data-phase]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('phase-filter').value = phase;
+  applyFilters();
+}
+
+function sortBy(field) {
+  if (sortField===field) sortDir*=-1; else { sortField=field; sortDir=1; }
+  document.querySelectorAll('thead th').forEach(th=>th.classList.remove('sorted'));
+  document.querySelectorAll('.sort-icon').forEach(ic=>ic.textContent='');
+  const th = document.querySelector(`[onclick="sortBy('${field}')"]`);
+  if (th) { th.classList.add('sorted'); th.querySelector('.sort-icon').textContent = sortDir===1?'↑':'↓'; }
+  doSort();
+}
+
+function doSort() {
+  filteredEvents.sort((a,b)=>{
+    let va = a[sortField]||'', vb = b[sortField]||'';
+    if (sortField==='id') { va=a.id||0; vb=b.id||0; }
+    if (typeof va==='number') return (va-vb)*sortDir;
+    return String(va).localeCompare(String(vb))*sortDir;
+  });
+  renderTable();
+}
+
+function exportExcel() {
+  if (!serverOnline) {
+    alert('⚠️  需要啟動本機 Server 才能匯出格式化 Excel\n\n步驟：\n1. 開啟終端機\n2. 執行: python3 bmc_sel_server.py\n3. 再按匯出按鈕\n\n(CSV 匯出不需要 Server，請使用左側 CSV 按鈕)');
+    return;
+  }
+  exportExcelViaServer();
+}
+
+async function exportExcelViaServer() {
+  const btn  = document.getElementById('export-btn');
+  const orig = btn.textContent;
+  btn.textContent = '⏳ 產生中...';
+  btn.disabled = true;
+  try {
+    const r = await fetch(SERVER_URL + '/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events: ALL_EVENTS, filename: currentFile ? currentFile.name : 'BMC_SEL' })
+    });
+    if (!r.ok) { const e = await r.json(); throw new Error(e.error || 'Excel 產生失敗'); }
+    const blob  = await r.blob();
+    const fname = (currentFile ? currentFile.name.replace(/\.[^.]+$/, '') : 'BMC_SEL') + '_Analysis.xlsx';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch(err) {
+    alert('匯出失敗：' + err.message);
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
+function exportCSVFallback() {
+  const cols = ['ID','Created (UTC)','Severity','Category','Phase','Message','MessageId','Resolved','Resolution','Event Relationship / Cause-Effect'];
+  const q = v => { const s=String(v??''); return (s.includes(',')||s.includes('\n')||s.includes('"'))?'"'+s.replace(/"/g,'""')+'"':s; };
+  const rows = filteredEvents.map(e=>[
+    q(e.id), q(e.ts), q(e.sev), q(e.cat),
+    q(e.phase_label||e.phase||''), q(e.msg), q(e.msgid||''),
+    q(e.resolved?'Yes':'No'),
+    q((e.resolution&&e.resolution!=='N/A')?e.resolution:''),
+    q(e.rel||'')
+  ]);
+  const csv = [cols.join(','),...rows.map(r=>r.join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download = 'BMC_SEL_export.csv'; a.click();
+}
+
+function resetToUpload() {
+  ALL_EVENTS=[]; filteredEvents=[]; allPhases=[]; selectedId=null;
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('upload-screen').style.display='flex';
+  document.getElementById('parse-error').style.display='none';
+  document.getElementById('file-input').value='';
+  document.getElementById('search').value='';
+}
+
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading-overlay').style.display='flex';
+}
+function hideLoading() { document.getElementById('loading-overlay').style.display='none'; }
+function showError(msg) {
+  hideLoading();
+  const el = document.getElementById('parse-error');
+  el.textContent = '⚠ ' + msg; el.style.display='block';
+  document.getElementById('upload-screen').style.display='flex';
+  document.getElementById('app-screen').style.display='none';
+}
+</script>
+</body>
+</html>
